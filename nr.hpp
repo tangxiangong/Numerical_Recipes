@@ -49,6 +49,25 @@ namespace nr {
     template<class T>
     inline void swap(T &, T &);
 
+    // exception handling
+
+#ifndef _USENRERRORCLASS_
+#define throw(message) \
+{printf("ERROR: %s\n      in file %s at line %d\n", message, __FILE__, __LINE__); throw(1); }
+#else
+struct NRerror{
+    char *message;
+    char *file;
+    int line;
+    NRerror(char *m, char *f, int l) : message(m), file(f), line(l) {}
+};
+#define throw(message) throw(NRerror(message, __FILE__, __LINE__));
+void NRcatch(NRerror err){
+    printf("ERROR: %s\n    in file %s at line %d\n",
+           err.message, err.file, err.line);
+    exit(1);
+}
+#endif
 #ifdef _USESTDVECTOR_
 #define Vector vector
 #else
@@ -73,11 +92,37 @@ namespace nr {
 
         inline T &operator[](int);
 
+        inline int size() const;
+
+        void print();
+
+//        Vector &zeros(int);
+
         ~Vector();
 
     };
 
-#endif
+#endif  // ifdef _USESTDVECTOR_
+
+    template<class T>
+    class Matrix{
+    private:
+        int m_row;  // 行
+        int m_column;  //列
+        T **m_data;
+    public:
+        Matrix();
+        Matrix(int, int);
+        Matrix(int, int, const T&);
+        Matrix(int, int, const T*);
+        Matrix(const Matrix &);
+        Matrix & operator=(const Matrix&);
+        using value_type=T;
+        inline T* operator[](const int);
+        inline int rows() const;
+        inline int columns() const;
+        ~Matrix();
+    };
 }
 
 template<class T>
@@ -190,7 +235,11 @@ nr::Vector<T> &nr::Vector<T>::operator=(const Vector<T> &rhs) {
 
 template<class T>
 inline T &nr::Vector<T>::operator[](const int i) {
-// TODO error: out of bounds
+#ifdef _CHECKBOUNDS_
+if (i<0 || i>= this->m_size){
+    throw("Vector subscript out of bounds");
+}
+#endif
     return this->m_data[i];
 }
 
@@ -201,4 +250,59 @@ nr::Vector<T>::~Vector() {
     this->m_data = nullptr;  // 防止野指针
 }
 
+template<class T>
+void nr::Vector<T>::print() {
+    int n = this->m_size;
+    if (n > 0 && this->m_data != nullptr) {
+        std::cout << "[" << this->m_data[0];
+        for (int i = 1; i < n; i++)
+            std::cout << " " << this->m_data[i];
+        std::cout << "]" << std::endl;
+    }
+}
+
+template<class T>
+int nr::Vector<T>::size() const {
+    return this->m_size;
+}
+
+//template<class T>
+//nr::Vector<T> &nr::Vector<T>::zeros(const int n) {
+//    T
+//    Vector<T> zeros {n, z};
+//}
+
+template<class T>
+nr::Matrix<T>::Matrix() : m_row(0), m_column(0), m_data(nullptr) {}
+
+template<class T>
+nr::Matrix<T>::Matrix(int m, int n) {
+    this->m_row = m;
+    this->m_column = n;
+    if (m > 0 && n > 0) {
+        this->m_data = new T *[m];
+        for(int i=0;i<m;i++)
+            this->m_data[i] = new T[n];
+    }
+    else
+        this->m_data = nullptr;
+}
+template<class T>
+nr::Matrix<T>::Matrix(int m, int n, const T &a){
+    this->m_row = m;
+    this->m_column = n;
+    if(m>0 && n>0){
+        this->m_data = new T*[m];
+        for(int i=0; i<m;i++)
+            this->m_data[i] = new T[n];
+    }
+    else
+        this->m_data = nullptr;
+    if(this->m_data != nullptr){
+        for(int i=0; i<m; i++){
+            for(int j=0; j<n; j++)
+                this->m_data[i][j] = a;
+        }
+    }
+}
 #endif //NUMERICAL_RECIPES_NR_HPP
